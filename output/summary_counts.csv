@@ -1,0 +1,9 @@
+handshape_scheme,handshape_class,movement_class,count,row_total,col_total,grand_total,pct_of_total,pct_of_row,pct_of_col
+BSL 4,simple,simple,1035,1743,1346,2319,44.6,59.4,76.9
+BSL 4,simple,complex,708,1743,973,2319,30.5,40.6,72.8
+BSL 4,complex,simple,311,576,1346,2319,13.4,54.0,23.1
+BSL 4,complex,complex,265,576,973,2319,11.4,46.0,27.2
+DSGS 6,simple,simple,1103,1898,1346,2319,47.6,58.1,81.9
+DSGS 6,simple,complex,795,1898,973,2319,34.3,41.9,81.7
+DSGS 6,complex,simple,243,421,1346,2319,10.5,57.7,18.1
+DSGS 6,complex,complex,178,421,973,2319,7.7,42.3,18.3
