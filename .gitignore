@@ -6,12 +6,12 @@ data/
 
 # Output files containing gloss + HamNoSys 
 
-output/cleaned_all.csv
-output/cleaned_analysis_pool.csv
-output/cleaned_pool_ns1a_only.csv
-output/classified_details.csv
-output/analysis_ready_pool.csv
-output/bsl_vs_dsgs_diff.csv
+step1_classification/output/cleaned_all.csv
+step1_classification/output/cleaned_analysis_pool.csv
+step1_classification/output/cleaned_pool_ns1a_only.csv
+step1_classification/output/classified_details.csv
+step1_classification/output/analysis_ready_pool.csv
+step1_classification/output/bsl_vs_dsgs_diff.csv
 
 # macOS
 .DS_Store
