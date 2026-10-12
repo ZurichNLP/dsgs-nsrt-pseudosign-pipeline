@@ -4,8 +4,18 @@
 # DSGS Signbank raw data
 data/
 
+# Output files containing gloss + HamNoSys 
+
+output/cleaned_all.csv
+output/cleaned_analysis_pool.csv
+output/cleaned_pool_ns1a_only.csv
+output/classified_details.csv
+output/analysis_ready_pool.csv
+output/bsl_vs_dsgs_diff.csv
+
 # macOS
 .DS_Store
+
 # ──────────────────────────────────────
 
 # Byte-compiled / optimized / DLL files
