@@ -63,7 +63,7 @@ def probe_structural_prefix(matches_fn, text):
         "remaining": inner[len(match):],
     }
 
-def _extract_with_reason(hamnosys):
+def _extract_with_reason(hamnosys, allow_empty_movement=False):
     """Extract parameters and report the first extraction failure."""
     if not hamnosys:
         return None, "empty_hamnosys"
@@ -122,14 +122,21 @@ def _extract_with_reason(hamnosys):
         remaining = remaining[len(loc):]
 
         mov = remaining
-        if not mov:
-            return None, "empty_mov"
 
-        parser_matches = getMovement(
-            mov, BETWEEN, SIZES, SPEEDS, REPETITIONS, CONTACT
-        )
-        if not parser_matches:
-            return None, "mov_not_recognised"
+        if not mov:
+            if allow_empty_movement:
+                parser_matches = []
+
+            else:
+                return None, "empty_mov"   
+
+        else:
+            parser_matches = getMovement(
+                mov, BETWEEN, SIZES, SPEEDS, REPETITIONS, CONTACT
+            )
+
+            if not parser_matches:
+                return None, "mov_not_recognised"
 
     except Exception as exc:
         return None, f"parser_error:{type(exc).__name__}"
@@ -147,11 +154,18 @@ def _extract_with_reason(hamnosys):
         return None, "reconstruction_failed"
 
     return result, ""
+    """limitation here: This can only garantee there is no character lost, 
+    it cannot garantee the parser matches/parameter borders are correct."""
 
 
-def extract_complete_movement(hamnosys):
-    """Preserve the interface used by the existing generator."""
-    result, _ = _extract_with_reason(hamnosys)
+
+def extract_complete_movement(hamnosys, allow_empty_movement=False):
+    """Extract parameters, optionally allowing a static block."""
+
+    result, _ = _extract_with_reason(
+        hamnosys,
+        allow_empty_movement=allow_empty_movement,
+    )
     return result
 
 
@@ -170,11 +184,13 @@ def balanced_brackets(text):
         if depth < 0:
             return False
 
-    return depth == 0
+    return depth == 0 # True if all brackets are closed.
+
 
 
 def audit_source(hamnosys, handedness=""):
-    """Flag structural risks without silently changing parameters."""
+    """Extract parameters and retain structural information."""
+
     result, failure = _extract_with_reason(hamnosys)
 
     if result is None:
@@ -182,37 +198,31 @@ def audit_source(hamnosys, handedness=""):
             "status": "unresolved",
             "reason": failure,
         }
-
-    flags = []
+    
     mov = result["mov"]
 
-    # The current generator does not preserve a symmetry prefix.
-    if result["symmetry"]:
-        flags.append("symmetry_requires_generation_rule")
-
-    # An asymmetric separator may introduce another hand description.
-    if handedness == "asym_two":
-        flags.append("asymmetric_handedness")
-
-    if any(ord(ch) == ASYM_SEPARATOR for ch in mov):
-        flags.append("separator_in_movement_suffix")
-
-    if not balanced_brackets(mov):
-        flags.append("movement_bracket_boundary")
-
-    # Preserve structural movement symbols rather than removing them.
-    result["has_replacement"] = any(
-        ord(char) == REPLACEMENT for char in mov
-    )
-    result["has_movement_brackets"] = any(
-        ord(char) == OPEN_BRACKET for char in mov
-    )
-    result["has_location"] = bool(result["loc"])
+    # Check bracket pairing in the complete transcription.
+    if not balanced_brackets(hamnosys):
+        return {
+            "status": "unresolved",
+            "reason": "unbalanced_brackets",
+        }
 
     return {
         **result,
-        "status": "review" if flags else "provisional",
-        "reason": ";".join(flags),
+        "status": "extracted",
+        "reason": "",
+        "handedness": handedness,
+        "has_location": bool(result["loc"]),
+        "has_replacement": any(
+            ord(ch) == REPLACEMENT for ch in mov
+        ),
+        "has_movement_brackets": any(
+            ord(ch) == OPEN_BRACKET for ch in mov
+        ),
+        "has_separator_in_suffix": any(
+            ord(ch) == ASYM_SEPARATOR for ch in mov
+        ),
     }
 
 
@@ -229,7 +239,7 @@ def run_corpus_audit():
         rows = list(csv.DictReader(f))
 
     extracted_rows = []
-    review_rows = []
+    failed_rows = []
     statuses = Counter()
     reasons = Counter()
     groups = Counter()
@@ -264,7 +274,7 @@ def run_corpus_audit():
             "hamnosys": row["hamnosys"],
         }
 
-        if status != "unresolved":
+        if status == "extracted":
             record.update({
                 "symmetry": result["symmetry"],
                 "hf": result["hf"],
@@ -275,11 +285,12 @@ def run_corpus_audit():
                 "has_location": result["has_location"],
                 "has_replacement": result["has_replacement"],
                 "has_movement_brackets": result["has_movement_brackets"],
+                "has_separator_in_suffix": result["has_separator_in_suffix"],
             })
             extracted_rows.append(record)
 
-        if status != "provisional":
-            review_rows.append(record)
+        else:
+            failed_rows.append(record)
 
     def write_csv(path, data, fields):
         with path.open("w", encoding="utf-8-sig", newline="") as f:
@@ -291,9 +302,12 @@ def run_corpus_audit():
         "gloss_id", "group", "handedness", "status", "reason",
         "hamnosys", "symmetry", "hf", "hp", "loc", "mov",
         "mov_codepoints", "has_location", "has_replacement",
-        "has_movement_brackets",
+        "has_movement_brackets", "has_separator_in_suffix",
     ]
-    review_fields = source_fields
+    failed_fields = [
+        "gloss_id", "group", "handedness", "status", "reason",
+        "hamnosys",
+    ]
 
     write_csv(
         OUTPUT_DIR / "source_parameters.csv",
@@ -302,8 +316,8 @@ def run_corpus_audit():
     )
     write_csv(
         OUTPUT_DIR / "extraction_review.csv",
-        review_rows,
-        review_fields,
+        failed_rows,
+        failed_fields,
     )
 
     print(f"Total signs: {len(rows)}")
@@ -315,8 +329,7 @@ def run_corpus_audit():
     for group in ("SS", "SC", "CS", "CC"):
         print(
             f"  {group}: "
-            f"provisional={groups[(group, 'provisional')]}, "
-            f"review={groups[(group, 'review')]}, "
+            f"extracted={groups[(group, 'extracted')]}, "
             f"unresolved={groups[(group, 'unresolved')]}"
         )
 
